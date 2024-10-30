@@ -54,7 +54,7 @@ project-root/
     └── index.html    # Main application page
 ```
 
-## 💻 Usage
+## Usage
 
 The application displays three panels, each demonstrating a different communication method:
 
@@ -70,7 +70,7 @@ The application displays three panels, each demonstrating a different communicat
    - Real-time bidirectional communication
    - Most efficient for frequent updates
 
-## ⚙️ Technical Implementation
+## Technical Implementation
 
 ### Server-side
 - Built with Express.js
