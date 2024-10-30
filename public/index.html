@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Polling Demo</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+      .container {
+        display: flex;
+        justify-content: space-around;
+        margin: 20px;
+      }
+      .panel {
+        width: 30%;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      .messages {
+        height: 300px;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        margin-bottom: 10px;
+        padding: 10px;
+      }
+      .input-group {
+        display: flex;
+        gap: 5px;
+      }
+      input {
+        flex-grow: 1;
+        padding: 5px;
+      }
+      button {
+        padding: 5px 10px;
+      }
+      .status {
+        font-size: 12px;
+        margin-top: 5px;
+        padding: 3px;
+        text-align: center;
+        border-radius: 3px;
+      }
+      .status.connected {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .status.disconnected {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .status.connecting {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      .debug-log {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        width: 500px;
+        height: 200px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        padding: 10px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .debug-log p {
+        margin: 2px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Short Polling -->
+      <div class="panel">
+        <h2>Short Polling</h2>
+        <div id="shortPollingMessages" class="messages"></div>
+        <div class="input-group">
+          <input
+            type="text"
+            id="shortPollingInput"
+            placeholder="Enter message..."
+          />
+          <button onclick="sendShortPolling()">Send</button>
+        </div>
+        <div id="shortPollingStatus" class="status"></div>
+      </div>
+
+      <!-- Long Polling -->
+      <div class="panel">
+        <h2>Long Polling</h2>
+        <div id="longPollingMessages" class="messages"></div>
+        <div class="input-group">
+          <input
+            type="text"
+            id="longPollingInput"
+            placeholder="Enter message..."
+          />
+          <button onclick="sendLongPolling()">Send</button>
+        </div>
+        <div id="longPollingStatus" class="status"></div>
+      </div>
+
+      <!-- WebSocket -->
+      <div class="panel">
+        <h2>WebSocket</h2>
+        <div id="websocketMessages" class="messages"></div>
+        <div class="input-group">
+          <input
+            type="text"
+            id="websocketInput"
+            placeholder="Enter message..."
+          />
+          <button onclick="sendWebSocket()">Send</button>
+        </div>
+        <div id="wsStatus" class="status">Initializing...</div>
+      </div>
+    </div>
+
+    <!-- Debug Log -->
+    <div id="debugLog" class="debug-log"></div>
+
+    <script>
+      // 除錯日誌函數
+      function debugLog(message) {
+        const log = document.getElementById("debugLog");
+        if (log) {
+          const entry = document.createElement("p");
+          entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+          log.appendChild(entry);
+          log.scrollTop = log.scrollHeight;
+        }
+        console.log(message);
+      }
+
+      // 更新狀態的安全函數
+      function updateStatus(elementId, status, message) {
+        const statusElement = document.getElementById(elementId);
+        if (statusElement) {
+          statusElement.className = "status " + status;
+          statusElement.textContent = message;
+        } else {
+          console.warn(`Status element ${elementId} not found`);
+        }
+      }
+
+      // WebSocket Implementation
+      let socket;
+
+      function connectWebSocket() {
+        debugLog("Initializing WebSocket connection");
+
+        socket = io({
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          timeout: 10000,
+        });
+
+        socket.on("connect", () => {
+          debugLog("WebSocket connected");
+          updateStatus("wsStatus", "connected", "Connected");
+        });
+
+        socket.on("disconnect", (reason) => {
+          debugLog("WebSocket disconnected: " + reason);
+          updateStatus("wsStatus", "disconnected", "Disconnected");
+        });
+
+        socket.on("connect_error", (error) => {
+          debugLog("WebSocket connection error: " + error.message);
+          updateStatus("wsStatus", "disconnected", "Connection Error");
+        });
+
+        socket.on("initial-messages", (messages) => {
+          debugLog("Received initial messages via WebSocket");
+          displayMessages("websocketMessages", messages);
+        });
+
+        socket.on("message-update", (messages) => {
+          debugLog("Received message update via WebSocket");
+          displayMessages("websocketMessages", messages);
+        });
+
+        return socket;
+      }
+
+      // 顯示訊息的安全函數
+      function displayMessages(elementId, messages) {
+        const element = document.getElementById(elementId);
+        if (element && Array.isArray(messages)) {
+          debugLog(`Displaying ${messages.length} messages in ${elementId}`);
+          element.innerHTML = messages
+            .map(
+              (m) => `${new Date(m.timestamp).toLocaleTimeString()}: ${m.text}`
+            )
+            .join("<br>");
+          element.scrollTop = element.scrollHeight;
+        } else {
+          console.warn(
+            `Element ${elementId} not found or messages is not an array`
+          );
+        }
+      }
+
+      // 發送訊息的函數
+      async function sendMessage(message, type) {
+        if (!message) {
+          debugLog("Empty message, not sending");
+          return;
+        }
+
+        debugLog(`Attempting to send message via ${type}: ${message}`);
+
+        if (type === "websocket") {
+          if (socket && socket.connected) {
+            socket.emit("new-message", message);
+            debugLog("Message sent via WebSocket");
+          } else {
+            debugLog("WebSocket not connected - message not sent");
+            alert("WebSocket is not connected. Please wait for reconnection.");
+          }
+        } else {
+          try {
+            const response = await fetch("/message", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message }),
+            });
+            debugLog(`Message sent via HTTP (${type})`);
+          } catch (error) {
+            debugLog(`Error sending message via ${type}: ${error.message}`);
+            alert("Failed to send message. Please try again.");
+          }
+        }
+      }
+
+      // Short Polling Implementation
+      function startShortPolling() {
+        setInterval(async () => {
+          try {
+            const response = await fetch("/messages/short-polling");
+            const messages = await response.json();
+            displayMessages("shortPollingMessages", messages);
+            updateStatus("shortPollingStatus", "connected", "Updated");
+            debugLog("Short polling update received");
+          } catch (error) {
+            debugLog("Short polling error: " + error.message);
+            updateStatus("shortPollingStatus", "disconnected", "Error");
+          }
+        }, 5000);
+      }
+
+      // Long Polling Implementation
+      async function startLongPolling() {
+        let messageCount = 0;
+
+        const poll = async () => {
+          try {
+            debugLog("Starting long poll request");
+            updateStatus("longPollingStatus", "connecting", "Polling...");
+            const response = await fetch(
+              `/messages/long-polling?messageCount=${messageCount}`
+            );
+            const messages = await response.json();
+            messageCount = messages.length;
+            displayMessages("longPollingMessages", messages);
+            updateStatus("longPollingStatus", "connected", "Updated");
+            debugLog("Long polling update received");
+            poll();
+          } catch (error) {
+            debugLog("Long polling error: " + error.message);
+            updateStatus("longPollingStatus", "disconnected", "Error");
+            setTimeout(poll, 1000);
+          }
+        };
+
+        poll();
+      }
+
+      function sendShortPolling() {
+        const input = document.getElementById("shortPollingInput");
+        if (input) {
+          sendMessage(input.value, "short-polling");
+          input.value = "";
+        }
+      }
+
+      function sendLongPolling() {
+        const input = document.getElementById("longPollingInput");
+        if (input) {
+          sendMessage(input.value, "long-polling");
+          input.value = "";
+        }
+      }
+
+      function sendWebSocket() {
+        const input = document.getElementById("websocketInput");
+        if (input) {
+          sendMessage(input.value, "websocket");
+          input.value = "";
+        }
+      }
+
+      // 添加鍵盤事件處理
+      document.addEventListener("DOMContentLoaded", () => {
+        ["shortPollingInput", "longPollingInput", "websocketInput"].forEach(
+          (id) => {
+            const input = document.getElementById(id);
+            if (input) {
+              input.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                  switch (id) {
+                    case "shortPollingInput":
+                      sendShortPolling();
+                      break;
+                    case "longPollingInput":
+                      sendLongPolling();
+                      break;
+                    case "websocketInput":
+                      sendWebSocket();
+                      break;
+                  }
+                }
+              });
+            }
+          }
+        );
+      });
+
+      // 啟動所有服務
+      debugLog("Starting all services...");
+      startShortPolling();
+      startLongPolling();
+      connectWebSocket();
+    </script>
+  </body>
+</html>
