@@ -9,13 +9,13 @@ This project implements three different polling methods:
 - **Long Polling**: Server hold request until new data arrives
 - **WebSocket**: Full-duplex communication using Socket.IO
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before you begin, ensure you have installed:
 - [Node.js](https://nodejs.org/) (14.0 or higher)
 - [npm](https://www.npmjs.com/) (6.0 or higher)
 
-## 🛠 Installation
+## Installation
 
 1. Clone the repository
 ```bash
@@ -32,7 +32,7 @@ cd your-repo-name
 npm install
 ```
 
-## 🚦 Running the Application
+## Running the Application
 
 1. Start the server
 ```bash
@@ -43,7 +43,7 @@ node server.js
 http://localhost:3000
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 project-root/
@@ -54,12 +54,12 @@ project-root/
     └── index.html    # Main application page
 ```
 
-## 💻 Usage
+## Usage
 
 The application displays three panels, each demonstrating a different communication method:
 
 1. **Short Polling Panel**
-   - Automatically polls server every 2 seconds
+   - Automatically polls server every 5 seconds
    - Simple and straightforward implementation
 
 2. **Long Polling Panel**
@@ -70,7 +70,7 @@ The application displays three panels, each demonstrating a different communicat
    - Real-time bidirectional communication
    - Most efficient for frequent updates
 
-## ⚙️ Technical Implementation
+## Technical Implementation
 
 ### Server-side
 - Built with Express.js
